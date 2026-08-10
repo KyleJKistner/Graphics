@@ -1,0 +1,67 @@
+name: Verify Sz8 surface and positive-rank fiber
+
+on:
+  push:
+    branches:
+      - research-sz8-verify-20260810
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: sagemath/sagemath:10.9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact verification
+        shell: bash
+        run: |
+          cat > /tmp/verify.sage <<'SAGE'
+          load('research/sz8_surface_data.sage')
+          print('BELYI_IDENTITY_OK', Q2*A^3-F/C == B^2)
+          print('BASE_CHANGE_IDENTITY_OK', Q2(N/H) == 13*q^3/H^2)
+          print('DISCRIMINANT_IDENTITY_OK', Delta == Delta_factored)
+          print('DEGREES', c4.degree(), c6.degree(), Delta.degree())
+
+          t0 = -QQ(10)/13
+          E0 = fiber(t0)
+          a = E0.a4(); b = E0.a6()
+          delta = -b/a
+          Et = fiber(t0, delta)
+          P = Et(delta^2, delta^3)
+          assert P in Et
+          print('T0', t0)
+          print('U0', u_map(t0))
+          print('UNTWISTED_A4', a)
+          print('UNTWISTED_A6', b)
+          print('CONSTANT_TWIST_DELTA', delta)
+          print('TWISTED_FIBER_AINVS', list(Et.a_invariants()))
+          print('POINT_ON_TWISTED_FIBER', tuple(P))
+
+          c = a^3/b^2
+          Ec = EllipticCurve(QQ,[0,0,0,c,-c])
+          Q = Ec(1,1)
+          assert Q in Ec
+          print('NORMALIZED_C', c)
+          print('NORMALIZED_CURVE_AINVS', list(Ec.a_invariants()))
+          print('NORMALIZED_POINT', tuple(Q))
+          print('NORMALIZED_POINT_CANONICAL_HEIGHT', Q.height())
+          print('NORMALIZED_POINT_ORDER', Q.order())
+
+          p = 11
+          Ebar = Ec.change_ring(GF(p))
+          Qbar = Ebar(Q)
+          print('GOOD_REDUCTION_11', Ebar.discriminant() != 0)
+          print('C_MOD_11', GF(p)(c))
+          print('REDUCTION_POINT_ORDER_11', Qbar.order())
+          assert Qbar.order() == 16
+          assert Q.order() == Infinity
+          print('POSITIVE_RANK_CERTIFIED', True)
+          SAGE
+          sage /tmp/verify.sage
