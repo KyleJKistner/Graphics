@@ -1,0 +1,65 @@
+name: Sz8 Heegner point computation
+
+on:
+  push:
+    branches:
+      - research-sz8-heegner-20260809
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  heegner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: sagemath/sagemath:10.9
+    steps:
+      - name: Compute analytic rank and exact rational point
+        shell: bash
+        run: |
+          cat > /tmp/heegner.sage <<'SAGE'
+          from sage.all import *
+          from sage.libs.pari import pari
+
+          ainvs = [0, 0, 1, -147036293428447300, 31096531290525027422504031]
+          M = EllipticCurve(QQ, ainvs)
+          print('MINIMAL_AINVS', list(M.a_invariants()), flush=True)
+          print('CONDUCTOR', M.conductor(), flush=True)
+          print('ROOT_NUMBER', M.root_number(), flush=True)
+          print('TORSION', M.torsion_subgroup(), flush=True)
+
+          EP = pari.ellinit(ainvs)
+          ar = pari.ellanalyticrank(EP)
+          print('PARI_ANALYTIC_RANK', ar, flush=True)
+          for effort in [1, 3, 6, 10]:
+              try:
+                  rr = pari.ellrank(EP, effort)
+                  print('PARI_ELLRANK', effort, rr, flush=True)
+                  if len(rr[3]) > 0:
+                      hp = rr[3][0]
+                      x = QQ(hp[0]); y = QQ(hp[1])
+                      P = M(x,y)
+                      print('POINT_FROM_ELLRANK', effort, tuple(P), flush=True)
+                      print('POINT_ORDER', P.order(), flush=True)
+                      print('POINT_HEIGHT', P.height(), flush=True)
+                      raise SystemExit(0)
+              except SystemExit:
+                  raise
+              except Exception as exc:
+                  print('ELLRANK_ERROR', effort, repr(exc), flush=True)
+
+          if ZZ(ar[0]) != 1:
+              raise RuntimeError('analytic rank is not one')
+          hp = pari.ellheegner(EP)
+          print('PARI_HEEGNER_RAW', hp, flush=True)
+          x = QQ(hp[0]); y = QQ(hp[1])
+          P = M(x,y)
+          print('MINIMAL_POINT', tuple(P), flush=True)
+          print('POINT_ORDER', P.order(), flush=True)
+          print('POINT_HEIGHT', P.height(), flush=True)
+          SAGE
+          timeout 57m sage /tmp/heegner.sage
