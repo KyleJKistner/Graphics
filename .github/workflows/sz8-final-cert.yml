@@ -20,9 +20,12 @@ jobs:
       - name: Fetch exact surface data and certify the universal fiber
         shell: bash
         run: |
-          curl -fsSL \
-            https://raw.githubusercontent.com/KyleJKistner/github-pipeline-template/research-sz8-closure-20260810/research/sz8_surface_data.sage \
-            -o /tmp/sz8_surface_data.sage
+          python3 - <<'PY'
+          import urllib.request
+          urllib.request.urlretrieve(
+              'https://raw.githubusercontent.com/KyleJKistner/github-pipeline-template/research-sz8-closure-20260810/research/sz8_surface_data.sage',
+              '/tmp/sz8_surface_data.sage')
+          PY
           cat > /tmp/final.sage <<'SAGE'
           load('/tmp/sz8_surface_data.sage')
 
