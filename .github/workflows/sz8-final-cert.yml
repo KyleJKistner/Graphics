@@ -3,6 +3,8 @@ name: Sz8 final exact certificate
 on:
   push:
     branches: [research-sz8-final-cert-20260810]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -39,7 +41,6 @@ jobs:
                      for P in [N,D4h,D5h,D7h])
           assert (c4.degree(),c6.degree(),348-Delta.degree())==(116,174,13)
 
-          # Split rational I_13 cusps select the constant twist d=-13.
           d=QQ(-13)
           for cusp in [QQ(5)/13,QQ(20)/13]:
               Nv=N(cusp)
