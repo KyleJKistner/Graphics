@@ -1,0 +1,84 @@
+name: Sz8 final exact certificate
+
+on:
+  push:
+    branches: [research-sz8-final-cert-20260810]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certificate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: sagemath/sagemath:10.9
+    steps:
+      - name: Fetch exact surface data and certify the universal fiber
+        shell: bash
+        run: |
+          curl -fsSL \
+            https://raw.githubusercontent.com/KyleJKistner/github-pipeline-template/research-sz8-closure-20260810/research/sz8_surface_data.sage \
+            -o /tmp/sz8_surface_data.sage
+          cat > /tmp/final.sage <<'SAGE'
+          load('/tmp/sz8_surface_data.sage')
+
+          assert Q2*A^3-F/C == B^2
+          assert H^2*Q2(N/H) == 13*q^3
+          sigma = 5*(4*t-5)/(13*t-5)
+          assert sigma(sigma(sigma)) == t
+          assert (N/H)(sigma) == N/H
+          assert Delta == Delta_factored
+
+          support=[N,H,q,D4h,D5h,D7h]
+          assert all(P.is_squarefree() for P in support)
+          assert all(gcd(support[i],support[j])==1
+                     for i in range(len(support)) for j in range(i+1,len(support)))
+          assert all(gcd(P,Ah)==1 and gcd(P,Bh)==1
+                     for P in [N,D4h,D5h,D7h])
+          assert (c4.degree(),c6.degree(),348-Delta.degree())==(116,174,13)
+
+          # Split rational I_13 cusps select the constant twist d=-13.
+          d=QQ(-13)
+          for cusp in [QQ(5)/13,QQ(20)/13]:
+              Nv=N(cusp)
+              assert H(cusp)==0
+              c6v=13*Nv^58
+              assert -d^3*c6v == (13^2*Nv^29)^2
+
+          t0=QQ(-10)/13
+          assert u_map(t0)==QQ(25)/26
+          Et=fiber(t0,d)
+          E0=EllipticCurve(QQ,[0,0,0,
+              -2352580694855156800,
+               1990178002593601755040258000])
+          s=QQ(2)^3*QQ(3)^29*QQ(5)^29/QQ(13)^9
+          assert Et.a4()==s^4*E0.a4()
+          assert Et.a6()==s^6*E0.a6()
+          assert Et.is_isomorphic(E0)
+
+          M=EllipticCurve(QQ,[0,0,1,
+              -147036293428447300,
+               31096531290525027422504031])
+          assert E0.is_isomorphic(M)
+          P=M(QQ(-132304492285056251260935)/834962460944089,
+              QQ(171311983233573812310079321864068156)/24126838977063948566813)
+          assert M.has_good_reduction(3) and M.has_good_reduction(11)
+          assert M.change_ring(GF(3)).cardinality()==7
+          assert M.change_ring(GF(11)).cardinality()==8
+          assert gcd(7,8)==1
+          assert M.torsion_order()==1
+          assert P.order()==Infinity
+
+          print('PASS_BELYI_IDENTITY')
+          print('PASS_CYCLIC_CUBIC_LIFT')
+          print('PASS_DISCRIMINANT_AND_FIBERS')
+          print('PASS_UNIVERSAL_TWIST',d)
+          print('PASS_ACTUAL_FIBER',t0)
+          print('MINIMAL_MODEL',list(M.a_invariants()))
+          print('INFINITE_POINT',tuple(P))
+          print('POINT_HEIGHT',P.height())
+          print('FINITE_COUNTS',3,7,11,8)
+          SAGE
+          sage /tmp/final.sage
