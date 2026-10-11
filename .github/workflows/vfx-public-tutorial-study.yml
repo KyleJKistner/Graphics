@@ -1,0 +1,36 @@
+name: Public VFX tutorial study assets
+on:
+  push:
+    branches: [codex/blender-runtime-recovery-20261011]
+    paths: [.github/workflows/vfx-public-tutorial-study.yml]
+permissions:
+  contents: read
+jobs:
+  fetch-public-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download public tutorial files and preserve their license
+        shell: bash
+        run: |
+          mkdir -p study
+          python3 - <<'PY'
+          import urllib.request, urllib.parse, pathlib, hashlib, json
+          root='https://raw.githubusercontent.com/NEO1842/Blender-Fire-Energy-Sphere/main/'
+          paths=['LICENSE.md','README.md','Blender Fire Energy Sphere/Fire Energy Sphere.blend','Blender Fire Energy Sphere/Fire Energy Sphere Video.blend','Blender Fire Energy Sphere/Fire Energy Sphere.png']
+          report=[]
+          for p in paths:
+              url=root+urllib.parse.quote(p)
+              data=urllib.request.urlopen(url, timeout=30).read()
+              dest=pathlib.Path('study')/pathlib.Path(p).name
+              dest.write_bytes(data)
+              report.append({'url':url,'file':dest.name,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          pathlib.Path('study/SOURCE_MANIFEST.json').write_text(json.dumps(report,indent=2))
+          PY
+      - name: Return public study assets only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vfx-public-tutorial-study
+          path: study/
+          retention-days: 1
+          if-no-files-found: error
