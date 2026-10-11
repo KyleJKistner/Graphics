@@ -1,0 +1,60 @@
+name: Official Blender runtime recovery
+
+on:
+  push:
+    branches:
+      - codex/blender-runtime-recovery-20261011
+    paths:
+      - .github/workflows/blender-runtime-recovery.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blender-runtime-recovery
+  cancel-in-progress: false
+
+jobs:
+  fetch-official-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Download and verify the official Blender Linux archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package
+          cd package
+          base='https://download.blender.org/release/Blender5.2'
+          file='blender-5.2.2-linux-x64.tar.xz'
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 300 "$base/$file" --output "$file"
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 60 "$base/blender-5.2.2.sha256" --output blender-5.2.2.sha256
+          python3 - <<'PY'
+          import hashlib, json, pathlib, datetime
+          name = 'blender-5.2.2-linux-x64.tar.xz'
+          manifest = pathlib.Path('blender-5.2.2.sha256').read_text()
+          matches = [line.split()[0] for line in manifest.splitlines() if len(line.split()) == 2 and line.split()[1].lstrip('*') == name]
+          if len(matches) != 1:
+              raise RuntimeError('Expected one official checksum for the exact Linux archive')
+          actual = hashlib.file_digest(open(name, 'rb'), 'sha256').hexdigest()
+          if actual != matches[0]:
+              raise RuntimeError('Official Blender SHA256 mismatch')
+          report = {'source': 'https://download.blender.org/release/Blender5.2/' + name, 'file': name, 'bytes': pathlib.Path(name).stat().st_size, 'sha256': actual, 'official_sha256_verified': True, 'checked_utc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+          pathlib.Path('download-verification.json').write_text(json.dumps(report, indent=2) + '\n')
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Verify the executable starts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/blender-check"
+          tar -xJf package/blender-5.2.2-linux-x64.tar.xz -C "$RUNNER_TEMP/blender-check"
+          "$RUNNER_TEMP/blender-check/blender-5.2.2-linux-x64/blender" --background --factory-startup --version | tee package/blender-version.txt
+      - name: Return the verified public runtime package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: blender-5.2.2-linux-x64-runtime
+          path: package/
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
